@@ -1,0 +1,23 @@
+# Xcode
+*.xcodeproj/
+*.xcworkspace/
+xcuserdata/
+DerivedData/
+build/
+*.ipa
+Payload/
+
+# Rust
+/core/target/
+**/*.rs.bk
+
+# macOS
+.DS_Store
+
+# Secrets — never commit signing material or pairing records
+*.p12
+*.mobileprovision
+*.pem
+pairing*.plist
+*.pairing
+secrets/

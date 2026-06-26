@@ -1,0 +1,21 @@
+[package]
+name = "actionrelay_core"
+version = "0.1.0"
+edition = "2021"
+description = "On-device Action Button press detector core: relay client + classifier + FFI"
+license = "AGPL-3.0-or-later"
+
+# staticlib for linking into the iOS NE via FFI; rlib so `cargo test` can build it on the host.
+[lib]
+name = "actionrelay_core"
+crate-type = ["staticlib", "rlib"]
+
+[dependencies]
+
+[profile.release]
+# NE memory budget is tight (§5). Optimize for size.
+opt-level = "z"
+lto = true
+panic = "abort"
+codegen-units = 1
+strip = true
