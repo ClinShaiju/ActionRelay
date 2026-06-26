@@ -7,7 +7,7 @@ import UniformTypeIdentifiers
 struct PairingView: View {
     @State private var importing = false
     @State private var message: String?
-    @State private var present = pairingPresent()
+    @State private var present = PairingView.pairingPresent()
 
     var body: some View {
         NavigationStack {

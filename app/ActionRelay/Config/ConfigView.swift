@@ -19,10 +19,12 @@ struct ConfigView: View {
                     }
                 }
 
-                Section("Timing (ms)") {
+                Section {
                     stepperRow("Press max", value: $config.pressMaxMs, range: 100...600)
                     stepperRow("Hold min", value: $config.holdMinMs, range: 300...1500)
                     stepperRow("Double window", value: $config.doubleWindowMs, range: 150...600)
+                } header: {
+                    Text("Timing (ms)")
                 } footer: {
                     Text("Classifier tunables (§8.1). Restart the listener to apply.")
                 }
