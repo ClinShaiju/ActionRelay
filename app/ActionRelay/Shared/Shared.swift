@@ -40,16 +40,26 @@ enum PairingImport {
 
     private static func saveData(_ data: Data) -> String {
         guard let plist = try? PropertyListSerialization.propertyList(
-                from: data, options: [], format: nil) as? [String: Any],
-              plist["HostID"] != nil || plist["DeviceCertificate"] != nil else {
-            return "Not a valid pairing record (missing HostID/DeviceCertificate)."
+                from: data, options: [], format: nil) as? [String: Any] else {
+            return "Not a property list."
         }
-        do {
-            try data.write(to: Store.pairingFile, options: .atomic)
-            return "Imported ✓"
-        } catch {
-            return "Save failed: \(error.localizedDescription)"
+        // The on-device tunnel (tunnel_create_rppairing) needs a RemotePairing
+        // file — an Ed25519 keypair + identifier — NOT the classic lockdown
+        // record (DeviceCertificate/HostID). Generate it once on a PC with the
+        // phone on USB:  idevice-tools rppairing pair ActionRelay rp_pairing.plist
+        // (docs/pairing.md). The lockdown record can't drive the tunnel.
+        if plist["public_key"] != nil, plist["private_key"] != nil, plist["identifier"] != nil {
+            do {
+                try data.write(to: Store.pairingFile, options: .atomic)
+                return "Imported ✓"
+            } catch {
+                return "Save failed: \(error.localizedDescription)"
+            }
         }
+        if plist["HostID"] != nil || plist["DeviceCertificate"] != nil {
+            return "That's a lockdown record, not a RemotePairing file. On a PC (iPhone on USB) run:  idevice-tools rppairing pair ActionRelay rp_pairing.plist  — then import rp_pairing.plist. See docs/pairing.md."
+        }
+        return "Unrecognized pairing file (needs public_key / private_key / identifier)."
     }
 
     static var present: Bool { FileManager.default.fileExists(atPath: Store.pairingFile.path) }

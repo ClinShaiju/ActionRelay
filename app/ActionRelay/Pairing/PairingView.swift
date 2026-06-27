@@ -25,7 +25,7 @@ struct PairingView: View {
                         Button("Remove", role: .destructive) { remove() }
                     }
                 } footer: {
-                    Text("Generate on a computer with idevice_pair (not iLoader on iOS 26.x). See docs/pairing.md.")
+                    Text("Needs a RemotePairing file (public_key/private_key/identifier), not a lockdown record. On a PC (iPhone on USB): idevice-tools rppairing pair ActionRelay rp_pairing.plist — see docs/pairing.md.")
                 }
 
                 Section {
