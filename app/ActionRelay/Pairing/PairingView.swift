@@ -44,10 +44,8 @@ struct PairingView: View {
 
     private func handleImport(_ result: Result<[URL], Error>) {
         guard let src = try? result.get().first else { return }
-        if let src {
-            message = PairingImport.save(from: src)
-            present = PairingImport.present
-        }
+        message = PairingImport.save(from: src)
+        present = PairingImport.present
     }
 
     private func remove() {
