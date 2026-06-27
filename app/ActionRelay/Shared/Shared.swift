@@ -69,6 +69,8 @@ enum PairingImport {
 enum DispatchTarget: String, Codable, CaseIterable, Identifiable {
     case notification
     case webhook
+    case flashlight
+    case shortcut
     var id: String { rawValue }
 }
 
@@ -76,6 +78,7 @@ enum DispatchTarget: String, Codable, CaseIterable, Identifiable {
 struct AppConfig: Codable, Equatable {
     var target: DispatchTarget = .notification
     var webhookURL: String = ""
+    var shortcutName: String = ""
 
     // Classifier tunables (§8.1), patchable without a rebuild.
     var pressMaxMs: UInt64 = 350

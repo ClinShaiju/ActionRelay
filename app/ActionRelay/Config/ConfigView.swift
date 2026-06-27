@@ -10,12 +10,18 @@ struct ConfigView: View {
                     Picker("Action", selection: $config.target) {
                         Text("Local notification").tag(DispatchTarget.notification)
                         Text("Webhook (POST)").tag(DispatchTarget.webhook)
+                        Text("Flashlight toggle").tag(DispatchTarget.flashlight)
+                        Text("Run Shortcut").tag(DispatchTarget.shortcut)
                     }
                     if config.target == .webhook {
                         TextField("https://…", text: $config.webhookURL)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
                             .keyboardType(.URL)
+                    }
+                    if config.target == .shortcut {
+                        TextField("Shortcut name (exact)", text: $config.shortcutName)
+                            .autocorrectionDisabled()
                     }
                 }
 
