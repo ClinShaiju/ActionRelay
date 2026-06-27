@@ -33,6 +33,13 @@ targets:
         UILaunchStoryboardName: LaunchScreen
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         UIBackgroundModes: [audio]
+        # The userspace tunnel connects to the device's own dev services at
+        # 10.7.0.1 — a LOCAL network address. iOS Local Network privacy blocks
+        # that (silent timeout) unless the app declares intent and the user
+        # grants the "Local Network" permission. NSBonjourServices is what
+        # StikDebug ships to unlock the same path.
+        NSLocalNetworkUsageDescription: "ActionRelay connects to this device's own developer tunnel (10.7.0.1) to read Action Button presses. Required for the listener."
+        NSBonjourServices: [_remotepairing._tcp, _remoted._tcp]
         # "Open in ActionRelay" from the share sheet (robust pairing import).
         LSSupportsOpeningDocumentsInPlace: true
         CFBundleDocumentTypes:
