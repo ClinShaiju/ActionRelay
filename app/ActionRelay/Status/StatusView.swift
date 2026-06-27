@@ -1,36 +1,32 @@
 import SwiftUI
-import NetworkExtension
 
 struct StatusView: View {
-    @StateObject private var tunnel = TunnelManager()
+    @StateObject private var listener = ListenerService.shared
 
     var body: some View {
         NavigationStack {
             List {
                 Section("Listener") {
-                    row("VPN", value: vpnLabel, ok: tunnel.state == .connected)
-                    row("Tunnel", value: tunnel.status.tunnelUp ? "up" : "down",
-                        ok: tunnel.status.tunnelUp)
-                    row("Pairing", value: tunnel.status.pairingValid ? "valid" : "missing",
-                        ok: tunnel.status.pairingValid)
-                    if let hb = tunnel.status.lastHeartbeat {
-                        row("Heartbeat", value: hb.formatted(date: .omitted, time: .standard), ok: true)
+                    row("Running", value: listener.running ? "yes" : "no", ok: listener.running)
+                    row("Pairing", value: pairingPresent ? "imported" : "missing", ok: pairingPresent)
+                    row("Last event", value: listener.lastEvent ?? "—", ok: listener.lastEvent != nil)
+                    if let err = listener.lastError {
+                        row("Error", value: err, ok: false)
                     }
-                    row("Last event", value: tunnel.status.lastEvent ?? "—", ok: tunnel.status.lastEvent != nil)
                 }
 
                 Section {
-                    if tunnel.state == .connected || tunnel.state == .connecting {
-                        Button("Stop listener", role: .destructive) { tunnel.stop() }
+                    if listener.running {
+                        Button("Stop listener", role: .destructive) { listener.stop() }
                     } else {
-                        Button("Start listener") { Task { try? await tunnel.start() } }
+                        Button("Start listener") { listener.start() }
                     }
                 } footer: {
-                    Text("Requires Wi-Fi or Airplane Mode on and the loopback VPN active at all times (§4). Set system Action Button → \"No Action\" so presses don't double-fire (§8.2).")
+                    Text("Runs in-app with a silent-audio keepalive (no VPN, no Network Extension). Set system Action Button → \"No Action\" so presses don't double-fire (§8.2). After a reboot, open the app once to restart the listener.")
                 }
 
                 Section("Build status") {
-                    Text("⚠️ Pre–Phase 0: the relay signal is not yet confirmed on this device. The listener pipeline is wired but no button events stream until Phase 0 + the Rust tunnel land. See docs/signal.md.")
+                    Text("⚠️ The tunnel/relay runtime isn't wired yet, so no button events stream. The pipeline (keepalive → tunnel → relay → classifier → dispatch) is in place; idevice tunnel bring-up is the remaining step. See docs/integration.md.")
                         .font(.footnote).foregroundStyle(.secondary)
                 }
             }
@@ -38,23 +34,15 @@ struct StatusView: View {
         }
     }
 
-    private var vpnLabel: String {
-        switch tunnel.state {
-        case .connected: return "connected"
-        case .connecting: return "connecting"
-        case .disconnecting: return "disconnecting"
-        case .disconnected: return "disconnected"
-        case .reasserting: return "reasserting"
-        case .invalid: return "not installed"
-        @unknown default: return "unknown"
-        }
+    private var pairingPresent: Bool {
+        FileManager.default.fileExists(atPath: Store.pairingFile.path)
     }
 
     private func row(_ title: String, value: String, ok: Bool) -> some View {
         HStack {
             Text(title)
             Spacer()
-            Text(value).foregroundStyle(.secondary)
+            Text(value).foregroundStyle(.secondary).lineLimit(1)
             Image(systemName: ok ? "checkmark.circle.fill" : "xmark.circle")
                 .foregroundStyle(ok ? .green : .secondary)
         }

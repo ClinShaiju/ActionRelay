@@ -20,11 +20,19 @@
 	<string>1</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
-	<key>UILaunchScreen</key>
-	<dict/>
+	<!-- Full-screen launch (fixes the iPhone-8-aspect letterbox). A storyboard is
+	     the most reliable way to make iOS render at the device's native size. -->
+	<key>UILaunchStoryboardName</key>
+	<string>LaunchScreen</string>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
+	</array>
+	<!-- Background persistence without a Network Extension: a silent AVAudioSession
+	     keeps the process alive while backgrounded/locked (docs/integration.md). -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
 	</array>
 </dict>
 </plist>

@@ -1,12 +1,13 @@
 # Compose spec for the idevice link-probe (docs/integration.md). Extends the base
-# project and links IDevice.xcframework into the NE so the #if canImport(IDevice)
-# relay path compiles. Used only by .github/workflows/idevice-link.yml — the main
-# build (project.yml) stays free of the 213 MB dependency.
+# project and links IDevice.xcframework into the single app target so the
+# #if canImport(IDevice) relay path compiles. Used only by idevice-link.yml — the
+# main build (project.yml) stays free of the 213 MB dependency.
 include:
   - project.yml
 
 targets:
-  ActionRelayTunnel:
+  ActionRelay:
     dependencies:
       - framework: vendor/IDevice.xcframework
-        embed: false
+        embed: true
+        codeSignOnCopy: true

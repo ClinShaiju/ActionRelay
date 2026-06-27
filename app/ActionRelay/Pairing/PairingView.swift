@@ -1,9 +1,9 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// Import + validate the pairing record into the App Group container (§7.1).
+/// Import + validate the pairing record into the app container (§7.1).
 /// Generated once on a computer with `idevice_pair` (docs/pairing.md), then
-/// lives on-device. The NE reads it from the shared container.
+/// lives on-device. The in-app listener reads it from there.
 struct PairingView: View {
     @State private var importing = false
     @State private var message: String?
@@ -40,8 +40,8 @@ struct PairingView: View {
 
     private func handleImport(_ result: Result<[URL], Error>) {
         do {
-            guard let src = try result.get().first,
-                  let dest = SharedStore.pairingFile else { return }
+            guard let src = try result.get().first else { return }
+            let dest = Store.pairingFile
             let scoped = src.startAccessingSecurityScopedResource()
             defer { if scoped { src.stopAccessingSecurityScopedResource() } }
             let data = try Data(contentsOf: src)
@@ -61,13 +61,12 @@ struct PairingView: View {
     }
 
     private func remove() {
-        if let f = SharedStore.pairingFile { try? FileManager.default.removeItem(at: f) }
+        try? FileManager.default.removeItem(at: Store.pairingFile)
         present = false
         message = "Removed."
     }
 
     private static func pairingPresent() -> Bool {
-        guard let f = SharedStore.pairingFile else { return false }
-        return FileManager.default.fileExists(atPath: f.path)
+        FileManager.default.fileExists(atPath: Store.pairingFile.path)
     }
 }

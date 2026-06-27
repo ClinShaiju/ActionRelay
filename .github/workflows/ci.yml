@@ -44,37 +44,8 @@ jobs:
             --title "ActionRelay $TAG (unsigned)" \
             --notes "Automated unsigned dev build from \`${GITHUB_SHA}\`.
 
-          **Not installable as-is** — sign with Feather + your distribution cert + the two .mobileprovision files (PROJECT.md §9). And not yet functional (the tunnel/relay runtime is unwired — see docs/integration.md).
+          Single-target, **zero restricted entitlements** — sign with Feather + any cert (incl. import-only) and it installs. Not yet functional: the idevice tunnel/relay runtime is unwired (see docs/integration.md), so no button events stream until that lands.
 
-          - \`ActionRelay-unsigned.ipa\` — main build (app + NE, no idevice; RelayClient is the stub).
-          - \`ActionRelay-minimal-unsigned.ipa\` — diagnostic: app only, no NE, no entitlements (tests whether a shared cert can install a plain build).
+          - \`ActionRelay-unsigned.ipa\` — the app (RelayClient is the stub).
           - \`ActionRelay-idevice-unsigned.ipa\` — present only when the idevice link-probe ran for this commit."
           gh release upload "$TAG" ActionRelay-unsigned.ipa --clobber
-
-  ios-build-minimal:
-    name: Build minimal (no-NE) diagnostic IPA
-    runs-on: macos-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install XcodeGen
-        run: brew install xcodegen
-      - name: Build minimal unsigned IPA
-        run: bash scripts/build_unsigned_ipa.sh project.minimal.yml ActionRelay-minimal-unsigned.ipa
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ActionRelay-minimal-unsigned
-          path: ActionRelay-minimal-unsigned.ipa
-          if-no-files-found: error
-      - name: Publish to Release (main pushes)
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          TAG="build-${GITHUB_SHA:0:7}"
-          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" \
-            --prerelease --title "ActionRelay $TAG (unsigned)" \
-            --notes "Automated unsigned dev build from \`${GITHUB_SHA}\`."
-          gh release upload "$TAG" ActionRelay-minimal-unsigned.ipa --clobber

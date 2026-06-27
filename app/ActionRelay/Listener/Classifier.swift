@@ -3,9 +3,9 @@ import Foundation
 /// Action Button gesture classifier — Swift port of `core/src/classifier.rs`.
 ///
 /// ponytail: this duplicates the Rust logic on purpose. The Rust copy is the
-/// canonical, cargo-tested one; this runs in the NE until the FFI bridge lands
-/// (PROJECT.md §10, Phase 1+). Keep the two in lockstep — any change here must
-/// be mirrored in classifier.rs and re-tested there.
+/// canonical, cargo-tested one; this runs in the app until the FFI bridge lands.
+/// Keep the two in lockstep — any change here must be mirrored in classifier.rs
+/// and re-tested there. Validated against real device timing (docs/signal.md).
 
 enum Phase { case down, up }
 enum Gesture { case press, hold, double }

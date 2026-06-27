@@ -10,10 +10,10 @@ settings:
     MARKETING_VERSION: "0.1.0"
     CURRENT_PROJECT_VERSION: "1"
     SWIFT_VERSION: "5.0"
-    # CI builds unsigned (see .github/workflows). Real signing is done by Feather
-    # on-device with the distribution cert + the two .mobileprovision files (§9).
     CODE_SIGN_STYLE: Manual
-    DEVELOPMENT_TEAM: ""
+    # NE-free, single-target, ZERO restricted entitlements — installable with an
+    # import-only/wildcard cert (docs/integration.md). Background persistence is a
+    # silent-audio keepalive, not a Network Extension.
 
 targets:
   ActionRelay:
@@ -23,28 +23,10 @@ targets:
       - path: app/ActionRelay
     info:
       path: app/Info.plist
-    entitlements:
-      path: app/ActionRelay.entitlements
+    # No entitlements file on purpose.
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.clinshaiju.actionrelay
-    dependencies:
-      - target: ActionRelayTunnel
-
-  ActionRelayTunnel:
-    type: app-extension
-    platform: iOS
-    sources:
-      - path: tunnel
-      # Shared models live with the app but are compiled into the NE too.
-      - path: app/ActionRelay/Shared/Shared.swift
-    info:
-      path: tunnel/Info.plist
-    entitlements:
-      path: tunnel/Tunnel.entitlements
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.clinshaiju.actionrelay.tunnel
 
 schemes:
   ActionRelay:
