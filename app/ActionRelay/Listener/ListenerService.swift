@@ -9,6 +9,8 @@ final class ListenerService: ObservableObject {
     static let shared = ListenerService()
 
     @Published private(set) var running = false
+    @Published private(set) var tunnelUp = false
+    @Published private(set) var relayUp = false
     @Published private(set) var lastEvent: String?
     @Published private(set) var lastError: String?
 
@@ -56,6 +58,15 @@ final class ListenerService: ObservableObject {
     /// it. Without IDevice linked, the relay stub runs (emits nothing).
     private func startRelay(_ relay: RelayClient) {
 #if canImport(IDevice)
+        relay.onConnected = { [weak self] in
+            Task { @MainActor in self?.relayUp = true }
+        }
+        relay.onClosed = { [weak self] msg in
+            Task { @MainActor in
+                self?.relayUp = false
+                if let msg { self?.lastError = "relay: \(msg)" }
+            }
+        }
         Task.detached { [weak self] in
             let tunnel = TunnelBringup()
             do {
@@ -63,10 +74,10 @@ final class ListenerService: ObservableObject {
                 guard let a = tunnel.adapter, let h = tunnel.handshake else {
                     throw TunnelBringup.TunnelError.message("tunnel handles unavailable")
                 }
+                await MainActor.run { self?.tunnel = tunnel; self?.tunnelUp = true }
                 relay.startRSD(adapter: a, handshake: h)
-                await MainActor.run { self?.tunnel = tunnel }
             } catch {
-                await MainActor.run { self?.lastError = "tunnel: \(error)" }
+                await MainActor.run { self?.tunnelUp = false; self?.lastError = "tunnel: \(error)" }
             }
         }
 #else
@@ -84,6 +95,8 @@ final class ListenerService: ObservableObject {
         tunnel?.stop(); tunnel = nil
 #endif
         running = false
+        tunnelUp = false
+        relayUp = false
     }
 
     private func fire(_ g: Gesture, _ dispatcher: Dispatcher) {

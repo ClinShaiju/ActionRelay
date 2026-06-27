@@ -13,6 +13,10 @@ struct ButtonEvent {
 
 final class RelayClient {
     var onEvent: ((ButtonEvent) -> Void)?
+    /// Relay connected to the device's syslog service over RSD (stream is live).
+    var onConnected: (() -> Void)?
+    /// Stream ended. nil = clean stop; non-nil = the failure message to surface.
+    var onClosed: ((String?) -> Void)?
     private var running = false
 
     /// Pure parse of one syslog line → ButtonEvent. Mirrors
@@ -32,21 +36,32 @@ final class RelayClient {
     private var client: OpaquePointer?
     private var thread: Thread?
 
+    /// Drain an idevice FFI error to a message string (and free it).
+    private static func message(_ err: UnsafeMutablePointer<IdeviceFfiError>?) -> String {
+        guard let err else { return "unknown error" }
+        let msg = err.pointee.message.map { String(cString: $0) } ?? "unknown error"
+        idevice_error_free(err)
+        return msg
+    }
+
     /// Start the relay over an already-established RSD tunnel. `adapter` and
     /// `handshake` come from the tunnel bring-up (see integration.md). Verified
-    /// idevice FFI: connect_rsd → next loop → free.
+    /// idevice FFI: connect_rsd → next loop → free. Connect/close are surfaced
+    /// via onConnected/onClosed so the Status tab can show why a stream stalls.
     func startRSD(adapter: OpaquePointer, handshake: OpaquePointer) {
         running = true
         let t = Thread { [weak self] in
             guard let self else { return }
             var client: OpaquePointer?
             if let err = syslog_relay_connect_rsd(adapter, handshake, &client) {
-                idevice_error_free(err); return
+                self.onClosed?(RelayClient.message(err)); return
             }
             self.client = client
+            self.onConnected?()
+            var closeMsg: String?
             while self.running {
                 var raw: UnsafeMutablePointer<CChar>?
-                if let err = syslog_relay_next(client, &raw) { idevice_error_free(err); break }
+                if let err = syslog_relay_next(client, &raw) { closeMsg = RelayClient.message(err); break }
                 guard let raw else { continue }
                 let line = String(cString: raw)
                 idevice_string_free(raw)
@@ -55,6 +70,7 @@ final class RelayClient {
                 }
             }
             if let client { syslog_relay_client_free(client) }
+            self.onClosed?(closeMsg)
         }
         t.stackSize = 512 * 1024
         thread = t

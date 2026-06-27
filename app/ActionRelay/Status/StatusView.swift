@@ -9,9 +9,18 @@ struct StatusView: View {
                 Section("Listener") {
                     row("Running", value: listener.running ? "yes" : "no", ok: listener.running)
                     row("Pairing", value: pairingPresent ? "imported" : "missing", ok: pairingPresent)
+                    if listener.running {
+                        row("Tunnel", value: listener.tunnelUp ? "up" : "connecting…", ok: listener.tunnelUp)
+                        row("Relay", value: listener.relayUp ? "streaming" : "off", ok: listener.relayUp)
+                    }
                     row("Last event", value: listener.lastEvent ?? "—", ok: listener.lastEvent != nil)
                     if let err = listener.lastError {
-                        row("Error", value: err, ok: false)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Label("Error", systemImage: "exclamationmark.triangle.fill")
+                                .foregroundStyle(.orange).font(.footnote.bold())
+                            Text(err).font(.footnote).foregroundStyle(.secondary)
+                                .textSelection(.enabled) // full message, copyable
+                        }
                     }
                 }
 
@@ -25,8 +34,8 @@ struct StatusView: View {
                     Text("Runs in-app with a silent-audio keepalive (no VPN, no Network Extension). Set system Action Button → \"No Action\" so presses don't double-fire (§8.2). After a reboot, open the app once to restart the listener.")
                 }
 
-                Section("Build status") {
-                    Text("⚠️ The tunnel/relay runtime isn't wired yet, so no button events stream. The pipeline (keepalive → tunnel → relay → classifier → dispatch) is in place; idevice tunnel bring-up is the remaining step. See docs/integration.md.")
+                Section {
+                    Text("Tunnel + relay run over the imported pairing file. When you press the Action Button, watch \"Last event\". If Tunnel or Relay stays down, the Error row above (tap-and-hold to copy) shows why.")
                         .font(.footnote).foregroundStyle(.secondary)
                 }
             }

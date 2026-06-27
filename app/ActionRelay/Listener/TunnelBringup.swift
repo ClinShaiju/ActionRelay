@@ -38,6 +38,16 @@ final class TunnelBringup {
         guard FileManager.default.fileExists(atPath: path) else {
             throw TunnelError.message("No pairing file — import one in the Pairing tab.")
         }
+        // Normalize to a canonical binary plist before idevice's Rust `plist`
+        // reader sees it. Pasted/AirDropped/emailed XML can carry a BOM or get
+        // re-encoded in a way Apple's PropertyListSerialization tolerates but the
+        // `plist` crate rejects ("plist error"). Binary plist has no such
+        // ambiguity. Idempotent; leaves the file untouched if it can't parse.
+        if let data = try? Data(contentsOf: Store.pairingFile),
+           let obj = try? PropertyListSerialization.propertyList(from: data, options: [], format: nil),
+           let bin = try? PropertyListSerialization.data(fromPropertyList: obj, format: .binary, options: 0) {
+            try? bin.write(to: Store.pairingFile, options: .atomic)
+        }
         var pairing: OpaquePointer?
         if let err = path.withCString({ rp_pairing_file_read($0, &pairing) }) {
             throw Self.consume(err, "read pairing file")
