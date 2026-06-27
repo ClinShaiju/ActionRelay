@@ -33,8 +33,8 @@ pub enum RelayKind {
     OsTrace,
 }
 
-/// Phase-0 deliverable, stored as config not a constant (§7.3). The actual
-/// values are filled in from docs/signal.md once captured on the device.
+/// Phase-0 deliverable, stored as config not a constant (§7.3).
+/// CONFIRMED on iPhone 16 Pro / iOS 26.5 — see docs/signal.md.
 #[derive(Clone, Debug)]
 pub struct MatchPredicate {
     pub relay: RelayKind,
@@ -45,5 +45,46 @@ pub struct MatchPredicate {
     pub category: Option<String>,
 }
 
-// ponytail: no parser implementation until Phase 0 fixes the exact line shape —
-// writing one now would be guessing at a format we have not captured.
+impl Default for MatchPredicate {
+    /// The Phase-0 result: backboardd logs the Action Button as a NOTICE-level
+    /// syslog line `Action page:0xB usage:0x2D downEvent:1 down` / `downEvent:0 up`.
+    fn default() -> Self {
+        MatchPredicate {
+            relay: RelayKind::Syslog,
+            message_contains: "Action page:0xB usage:0x2D".to_string(),
+            subsystem: Some("backboardd".to_string()),
+            category: None,
+        }
+    }
+}
+
+/// Parse a matched syslog line into a ButtonEvent. Returns None for non-matching
+/// lines. Phase is read from `downEvent:1` (down) / `downEvent:0` (up). The
+/// caller supplies the timestamp (line ts or local receipt) in ms.
+pub fn parse_syslog_line(line: &str, ts_ms: u64) -> Option<ButtonEvent> {
+    if !line.contains("Action page:0xB usage:0x2D") {
+        return None;
+    }
+    let phase = if line.contains("downEvent:1") {
+        Phase::Down
+    } else if line.contains("downEvent:0") {
+        Phase::Up
+    } else {
+        return None;
+    };
+    Some(ButtonEvent { phase, ts_ms })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_real_device_lines() {
+        let down = "backboardd{backboardd}[70] <NOTICE>: Action page:0xB usage:0x2D downEvent:1 down";
+        let up = "backboardd{backboardd}[70] <NOTICE>: Action page:0xB usage:0x2D downEvent:0 up";
+        assert_eq!(parse_syslog_line(down, 100).unwrap().phase, Phase::Down);
+        assert_eq!(parse_syslog_line(up, 200).unwrap().phase, Phase::Up);
+        assert!(parse_syslog_line("unrelated locationd spam", 0).is_none());
+    }
+}

@@ -17,14 +17,17 @@ tested. Everything that depends on the actual log signal is deliberately stubbed
 | SwiftUI app (status / config / pairing) | ✅ Compiles, wired to App Group |
 | PacketTunnel NE skeleton + pipeline | ✅ Compiles; classifier+dispatcher live |
 | Dispatch: notification / webhook (§8.3) | ✅ Implemented |
-| **Phase 0 signal capture** (§3) | ⛔ Needs physical device — see [docs/signal.md](docs/signal.md) |
-| RSD tunnel via idevice/em_proxy (§7.1) | 🚧 Stub — needs Phase 0 + Rust link |
-| Relay client os_trace/syslog (§7.2) | 🚧 Stub — needs Phase 0 |
+| **Phase 0 signal capture** (§3) | ✅ **GO** — confirmed on iPhone 16 Pro / iOS 26.5, see [docs/signal.md](docs/signal.md) |
+| RSD tunnel via idevice/em_proxy (§7.1) | 🚧 Stub — needs Rust link (Phase 1) |
+| Relay client `syslog_relay` (§7.2) | 🚧 Stub — predicate now known (Phase 2) |
 | Feather signing / install (§9) | 🚧 Manual — needs your distribution cert |
 
-**Why stubbed and not faked:** Phase 0 is an explicit GO/NO-GO gate. Until a
-short-tap is confirmed to emit a distinct, capturable log line on iOS 26.5, there
-is no signal to stream — so `RelayClient` emits nothing rather than pretend.
+**Phase 0 result:** a short tap emits a distinct down/up pair in plain syslog at
+default level — `backboardd <NOTICE>: Action page:0xB usage:0x2D downEvent:1 down`
+(and `downEvent:0 up`). Real-device timing validated the classifier thresholds
+exactly (181/188 ms taps, 1038 ms hold, 151 ms double-gap). The on-device build
+proceeds on the simplest path: `syslog_relay`, no DDI. Until the tunnel + relay
+are wired in, `RelayClient` emits nothing rather than fake a signal.
 
 ## What you get from CI
 
