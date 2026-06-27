@@ -20,7 +20,15 @@ final class ListenerService: ObservableObject {
     private var classifier: Classifier?
     private var dispatcher: Dispatcher?
     private var pollTimer: Timer?
+    private var watchdog: Timer?
     private var connecting = false
+
+    /// Steady reconnect cadence. ponytail: fixed interval, not exponential
+    /// backoff — a loopback-VPN blip (or switching to a real VPN and back) should
+    /// recover on the next tick, not after a stretched-out delay. Ceiling: while
+    /// the route is genuinely gone each attempt still costs a connect-timeout;
+    /// 3s is the gap between attempts, a battery-vs-responsiveness balance.
+    private static let watchdogInterval: TimeInterval = 3
 #if canImport(IDevice)
     private var tunnel: TunnelBringup?
 #endif
@@ -45,9 +53,20 @@ final class ListenerService: ObservableObject {
                 if let g = classifier.poll(Self.nowMs()) { self.fire(g) }
             }
         }
+
+        // Health watchdog: whenever the relay isn't streaming and we aren't
+        // mid-connect, (re)establish. Steady cadence, so recovery is prompt and
+        // predictable no matter how long the route was gone.
+        watchdog = Timer.scheduledTimer(withTimeInterval: Self.watchdogInterval, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self, self.running, !self.relayUp, !self.connecting else { return }
+                self.connect()
+            }
+        }
     }
 
-    /// A fresh relay wired to the classifier, with auto-reconnect on stream close.
+    /// A fresh relay wired to the classifier, surfacing connect/close so the
+    /// watchdog (and the immediate path below) can react.
     private func makeRelay() -> RelayClient {
         let relay = RelayClient()
         relay.onEvent = { [weak self] event in
@@ -57,14 +76,19 @@ final class ListenerService: ObservableObject {
             }
         }
         relay.onConnected = { [weak self] in
-            Task { @MainActor in self?.relayUp = true }
+            Task { @MainActor in
+                self?.relayUp = true
+                self?.connecting = false   // settled: streaming
+            }
         }
         relay.onClosed = { [weak self] msg in
             Task { @MainActor in
                 guard let self else { return }
                 self.relayUp = false
+                self.connecting = false
                 if let msg { self.lastError = "relay: \(msg)" }
-                // Stream died (VPN flap / sleep). Re-establish unless we're stopping.
+                // Stream died (VPN flap / sleep). Reconnect now unless stopping;
+                // the watchdog is the backstop if this attempt also fails.
                 if self.running {
                     self.tunnelUp = false
                     self.connect()
@@ -74,42 +98,41 @@ final class ListenerService: ObservableObject {
         return relay
     }
 
-    /// Bring up tunnel + relay, retrying with backoff until connected or stopped.
-    /// Reused for the first connect and every reconnect after a VPN drop.
+    /// One connect attempt: bring up the tunnel, then start the relay over it.
+    /// No retry loop here — the watchdog drives retries at a fixed cadence.
+    /// `connecting` stays true until the relay reports connected or closed, so a
+    /// watchdog tick can't spawn a second tunnel during the handshake window.
     private func connect() {
         guard running, !connecting else { return }
         connecting = true
 #if canImport(IDevice)
         Task.detached { [weak self] in
-            var delaySec: UInt64 = 1
-            while await self?.running == true {
-                do {
-                    let tunnel = TunnelBringup()
-                    try tunnel.start()
-                    guard let a = tunnel.adapter, let h = tunnel.handshake else {
-                        throw TunnelBringup.TunnelError.message("tunnel handles unavailable")
+            do {
+                let tunnel = TunnelBringup()
+                try tunnel.start()
+                guard let a = tunnel.adapter, let h = tunnel.handshake else {
+                    throw TunnelBringup.TunnelError.message("tunnel handles unavailable")
+                }
+                let relay = await MainActor.run { () -> RelayClient? in
+                    guard self?.running == true else {  // stop() raced us
+                        tunnel.stop(); self?.connecting = false; return nil
                     }
-                    let relay = await MainActor.run { () -> RelayClient in
-                        self?.tunnel?.stop()              // drop the dead tunnel, if any
-                        let r = self?.makeRelay() ?? RelayClient()
-                        self?.tunnel = tunnel
-                        self?.relay = r
-                        self?.tunnelUp = true
-                        self?.connecting = false
-                        return r
-                    }
-                    relay.startRSD(adapter: a, handshake: h)
-                    return
-                } catch {
-                    await MainActor.run {
-                        self?.tunnelUp = false
-                        self?.lastError = "tunnel: \(error)"
-                    }
-                    try? await Task.sleep(nanoseconds: delaySec * 1_000_000_000)
-                    delaySec = min(delaySec * 2, 10) // cap backoff at 10s
+                    self?.tunnel?.stop()             // drop the dead tunnel, if any
+                    let r = self?.makeRelay() ?? RelayClient()
+                    self?.tunnel = tunnel
+                    self?.relay = r
+                    self?.tunnelUp = true
+                    return r
+                }
+                guard let relay else { return }
+                relay.startRSD(adapter: a, handshake: h) // onConnected/onClosed clears `connecting`
+            } catch {
+                await MainActor.run {
+                    self?.tunnelUp = false
+                    self?.lastError = "tunnel: \(error)"
+                    self?.connecting = false          // let the watchdog retry next tick
                 }
             }
-            await MainActor.run { self?.connecting = false }
         }
 #else
         let relay = makeRelay()
@@ -121,9 +144,10 @@ final class ListenerService: ObservableObject {
 
     func stop() {
         guard running else { return }
-        running = false        // set first so onClosed won't trigger a reconnect
+        running = false        // set first so onClosed/watchdog won't reconnect
         connecting = false
         pollTimer?.invalidate(); pollTimer = nil
+        watchdog?.invalidate(); watchdog = nil
         relay?.stop(); relay = nil
         classifier = nil
         dispatcher = nil
