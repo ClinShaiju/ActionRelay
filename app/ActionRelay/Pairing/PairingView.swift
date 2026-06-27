@@ -8,6 +8,7 @@ struct PairingView: View {
     @State private var importing = false
     @State private var message: String?
     @State private var present = PairingView.pairingPresent()
+    @State private var pasteText = ""
 
     var body: some View {
         NavigationStack {
@@ -25,6 +26,24 @@ struct PairingView: View {
                     }
                 } footer: {
                     Text("Generate on a computer with idevice_pair (not iLoader on iOS 26.x). See docs/pairing.md.")
+                }
+
+                Section {
+                    TextEditor(text: $pasteText)
+                        .frame(minHeight: 120)
+                        .font(.system(.caption, design: .monospaced))
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.never)
+                    Button("Import pasted text") {
+                        message = PairingImport.savePasted(pasteText)
+                        present = PairingImport.present
+                        if present { pasteText = "" }
+                    }
+                    .disabled(pasteText.isEmpty)
+                } header: {
+                    Text("Or paste pairing data")
+                } footer: {
+                    Text("Bulletproof fallback: paste the pairing file's contents (XML or base64) here. No file picker needed.")
                 }
 
                 if let message { Section { Text(message).font(.footnote) } }

@@ -15,21 +15,40 @@ enum Store {
 /// share-sheet "Open in ActionRelay" path (ActionRelayApp.onOpenURL). Validates
 /// it's a real pairing record, then saves to the app container.
 enum PairingImport {
+    /// Import from a picked/shared file URL.
     @discardableResult
     static func save(from src: URL) -> String {
         let scoped = src.startAccessingSecurityScopedResource()
         defer { if scoped { src.stopAccessingSecurityScopedResource() } }
+        guard let data = try? Data(contentsOf: src) else { return "Couldn't read the file." }
+        return saveData(data)
+    }
+
+    /// Bulletproof fallback: import from pasted text — raw XML plist or base64.
+    @discardableResult
+    static func savePasted(_ text: String) -> String {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "Nothing pasted." }
+        if trimmed.hasPrefix("<") {
+            return saveData(Data(trimmed.utf8)) // raw XML plist
+        }
+        if let d = Data(base64Encoded: trimmed.filter { !$0.isWhitespace }) {
+            return saveData(d) // base64
+        }
+        return "Pasted text isn't a plist or base64."
+    }
+
+    private static func saveData(_ data: Data) -> String {
+        guard let plist = try? PropertyListSerialization.propertyList(
+                from: data, options: [], format: nil) as? [String: Any],
+              plist["HostID"] != nil || plist["DeviceCertificate"] != nil else {
+            return "Not a valid pairing record (missing HostID/DeviceCertificate)."
+        }
         do {
-            let data = try Data(contentsOf: src)
-            guard let plist = try PropertyListSerialization.propertyList(
-                    from: data, options: [], format: nil) as? [String: Any],
-                  plist["HostID"] != nil || plist["DeviceCertificate"] != nil else {
-                return "Not a valid pairing record (missing HostID/DeviceCertificate)."
-            }
             try data.write(to: Store.pairingFile, options: .atomic)
-            return "Imported."
+            return "Imported ✓"
         } catch {
-            return "Import failed: \(error.localizedDescription)"
+            return "Save failed: \(error.localizedDescription)"
         }
     }
 
