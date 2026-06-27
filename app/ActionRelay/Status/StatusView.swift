@@ -31,7 +31,7 @@ struct StatusView: View {
                         Button("Start listener") { listener.start() }
                     }
                 } footer: {
-                    Text("Runs in-app with a silent-audio keepalive (no VPN, no Network Extension). Set system Action Button → \"No Action\" so presses don't double-fire (§8.2). After a reboot, open the app once to restart the listener.")
+                    Text("Requires a loopback VPN (LocalDevVPN or StosVPN, free on the App Store) installed AND enabled — that provides the 10.7.0.1 route to the device's own services. Without it the tunnel times out. ActionRelay itself has no Network Extension; it rides that VPN. Set system Action Button → \"No Action\" so presses don't double-fire (§8.2). After a reboot, open the app once to restart the listener.")
                 }
 
                 Section {
