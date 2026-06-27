@@ -16,6 +16,9 @@ final class ListenerService: ObservableObject {
     private var relay: RelayClient?
     private var classifier: Classifier?
     private var pollTimer: Timer?
+#if canImport(IDevice)
+    private var tunnel: TunnelBringup?
+#endif
 
     func start() {
         guard !running else { return }
@@ -36,8 +39,8 @@ final class ListenerService: ObservableObject {
                 if let g = classifier.onEvent(event.phase, event.tsMs) { self.fire(g, dispatcher) }
             }
         }
-        relay.start() // stub until the idevice tunnel is wired (startRSD); docs/integration.md
         self.relay = relay
+        startRelay(relay)
 
         // Flush buffered single presses once their double-window closes.
         pollTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
@@ -49,12 +52,37 @@ final class ListenerService: ObservableObject {
         running = true
     }
 
+    /// Bring up the idevice tunnel off the main thread, then start the relay over
+    /// it. Without IDevice linked, the relay stub runs (emits nothing).
+    private func startRelay(_ relay: RelayClient) {
+#if canImport(IDevice)
+        Task.detached { [weak self] in
+            let tunnel = TunnelBringup()
+            do {
+                try tunnel.start()
+                guard let a = tunnel.adapter, let h = tunnel.handshake else {
+                    throw TunnelBringup.TunnelError.message("tunnel handles unavailable")
+                }
+                relay.startRSD(adapter: a, handshake: h)
+                await MainActor.run { self?.tunnel = tunnel }
+            } catch {
+                await MainActor.run { self?.lastError = "tunnel: \(error)" }
+            }
+        }
+#else
+        relay.start()
+#endif
+    }
+
     func stop() {
         guard running else { return }
         pollTimer?.invalidate(); pollTimer = nil
         relay?.stop(); relay = nil
         classifier = nil
         keepAlive.stop()
+#if canImport(IDevice)
+        tunnel?.stop(); tunnel = nil
+#endif
         running = false
     }
 

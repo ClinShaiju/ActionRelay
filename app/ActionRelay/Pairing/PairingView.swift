@@ -31,7 +31,7 @@ struct PairingView: View {
             }
             .navigationTitle("Pairing")
             .fileImporter(isPresented: $importing,
-                          allowedContentTypes: [.propertyList, .data],
+                          allowedContentTypes: [.item],
                           allowsMultipleSelection: false) { result in
                 handleImport(result)
             }
