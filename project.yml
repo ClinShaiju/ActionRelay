@@ -33,6 +33,12 @@ targets:
         UILaunchStoryboardName: LaunchScreen
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         UIBackgroundModes: [audio]
+        # "Open in ActionRelay" from the share sheet (robust pairing import).
+        LSSupportsOpeningDocumentsInPlace: true
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: Pairing File
+            LSHandlerRank: Alternate
+            LSItemContentTypes: [public.data, com.apple.property-list, public.xml]
     # No entitlements file on purpose.
     settings:
       base:

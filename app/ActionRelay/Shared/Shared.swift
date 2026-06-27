@@ -11,6 +11,31 @@ enum Store {
     static var pairingFile: URL { dir.appendingPathComponent("pairing.plist") }
 }
 
+/// Shared pairing-import logic — used by both the in-app file picker and the
+/// share-sheet "Open in ActionRelay" path (ActionRelayApp.onOpenURL). Validates
+/// it's a real pairing record, then saves to the app container.
+enum PairingImport {
+    @discardableResult
+    static func save(from src: URL) -> String {
+        let scoped = src.startAccessingSecurityScopedResource()
+        defer { if scoped { src.stopAccessingSecurityScopedResource() } }
+        do {
+            let data = try Data(contentsOf: src)
+            guard let plist = try PropertyListSerialization.propertyList(
+                    from: data, options: [], format: nil) as? [String: Any],
+                  plist["HostID"] != nil || plist["DeviceCertificate"] != nil else {
+                return "Not a valid pairing record (missing HostID/DeviceCertificate)."
+            }
+            try data.write(to: Store.pairingFile, options: .atomic)
+            return "Imported."
+        } catch {
+            return "Import failed: \(error.localizedDescription)"
+        }
+    }
+
+    static var present: Bool { FileManager.default.fileExists(atPath: Store.pairingFile.path) }
+}
+
 /// What to do when a gesture fires (§8.3).
 enum DispatchTarget: String, Codable, CaseIterable, Identifiable {
     case notification

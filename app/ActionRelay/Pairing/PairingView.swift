@@ -35,28 +35,18 @@ struct PairingView: View {
                           allowsMultipleSelection: false) { result in
                 handleImport(result)
             }
+            .onReceive(NotificationCenter.default.publisher(for: .pairingImported)) { note in
+                message = note.userInfo?["message"] as? String
+                present = PairingImport.present
+            }
         }
     }
 
     private func handleImport(_ result: Result<[URL], Error>) {
-        do {
-            guard let src = try result.get().first else { return }
-            let dest = Store.pairingFile
-            let scoped = src.startAccessingSecurityScopedResource()
-            defer { if scoped { src.stopAccessingSecurityScopedResource() } }
-            let data = try Data(contentsOf: src)
-            // Minimal validation: it must be a plist with the expected keys.
-            guard let plist = try PropertyListSerialization.propertyList(
-                    from: data, options: [], format: nil) as? [String: Any],
-                  plist["HostID"] != nil || plist["DeviceCertificate"] != nil else {
-                message = "Not a valid pairing record (missing HostID/DeviceCertificate)."
-                return
-            }
-            try data.write(to: dest, options: .atomic)
-            present = true
-            message = "Imported."
-        } catch {
-            message = "Import failed: \(error.localizedDescription)"
+        guard let src = try? result.get().first else { return }
+        if let src {
+            message = PairingImport.save(from: src)
+            present = PairingImport.present
         }
     }
 
@@ -66,7 +56,5 @@ struct PairingView: View {
         message = "Removed."
     }
 
-    private static func pairingPresent() -> Bool {
-        FileManager.default.fileExists(atPath: Store.pairingFile.path)
-    }
+    private static func pairingPresent() -> Bool { PairingImport.present }
 }
