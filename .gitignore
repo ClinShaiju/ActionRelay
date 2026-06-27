@@ -11,6 +11,9 @@ Payload/
 /core/target/
 **/*.rs.bk
 
+# Vendored idevice xcframework (213 MB — fetched by scripts/fetch_idevice.sh)
+/vendor/
+
 # macOS
 .DS_Store
 

@@ -1,0 +1,31 @@
+name: idevice link probe
+
+# Manual only — proves the NE compiles + links against IDevice.xcframework with
+# the real syslog_relay FFI path (#if canImport(IDevice)). Not on push: the
+# xcframework is 213 MB. Runtime tunnel validation still needs a signed device
+# build (docs/integration.md).
+on:
+  workflow_dispatch:
+
+jobs:
+  link-probe:
+    name: Compile NE against idevice
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Fetch idevice xcframework
+        run: bash scripts/fetch_idevice.sh
+      - name: Generate project with idevice linked
+        run: xcodegen generate --spec project.idevice.yml
+      - name: Build (unsigned, links IDevice)
+        run: |
+          xcodebuild build \
+            -project ActionRelay.xcodeproj \
+            -scheme ActionRelay \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            CODE_SIGN_ENTITLEMENTS=""
