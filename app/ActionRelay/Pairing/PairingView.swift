@@ -30,22 +30,21 @@ struct PairingView: View {
                 if let message { Section { Text(message).font(.footnote) } }
             }
             .navigationTitle("Pairing")
-            .fileImporter(isPresented: $importing,
-                          allowedContentTypes: [.item],
-                          allowsMultipleSelection: false) { result in
-                handleImport(result)
+            .sheet(isPresented: $importing) {
+                DocumentPicker(
+                    onPick: { url in
+                        importing = false
+                        message = PairingImport.save(from: url)
+                        present = PairingImport.present
+                    },
+                    onCancel: { importing = false })
+                .ignoresSafeArea()
             }
             .onReceive(NotificationCenter.default.publisher(for: .pairingImported)) { note in
                 message = note.userInfo?["message"] as? String
                 present = PairingImport.present
             }
         }
-    }
-
-    private func handleImport(_ result: Result<[URL], Error>) {
-        guard let src = try? result.get().first else { return }
-        message = PairingImport.save(from: src)
-        present = PairingImport.present
     }
 
     private func remove() {
