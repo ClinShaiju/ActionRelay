@@ -6,24 +6,9 @@ struct ConfigView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("On press") {
-                    Picker("Action", selection: $config.target) {
-                        Text("Local notification").tag(DispatchTarget.notification)
-                        Text("Webhook (POST)").tag(DispatchTarget.webhook)
-                        Text("Flashlight toggle").tag(DispatchTarget.flashlight)
-                        Text("Run Shortcut").tag(DispatchTarget.shortcut)
-                    }
-                    if config.target == .webhook {
-                        TextField("https://…", text: $config.webhookURL)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-                            .keyboardType(.URL)
-                    }
-                    if config.target == .shortcut {
-                        TextField("Shortcut name (exact)", text: $config.shortcutName)
-                            .autocorrectionDisabled()
-                    }
-                }
+                gestureSection("Single press", action: $config.press)
+                gestureSection("Hold", action: $config.hold)
+                gestureSection("Double press", action: $config.double)
 
                 Section {
                     stepperRow("Press max", value: $config.pressMaxMs, range: 100...600)
@@ -32,14 +17,33 @@ struct ConfigView: View {
                 } header: {
                     Text("Timing (ms)")
                 } footer: {
-                    Text("Classifier tunables (§8.1). Restart the listener to apply.")
-                }
-
-                Section {
-                    Button("Save") { config.save() }
+                    Text("Action changes apply on the next press. Timing changes need a listener restart (Stop → Start). Shortcuts run from the background via a private launch with a one-tap notification fallback; flashlight + media run with no tap.")
                 }
             }
-            .navigationTitle("Action")
+            .navigationTitle("Actions")
+            // Auto-save: no Save button to forget. Action edits take effect on the
+            // next press because the dispatcher reloads config each fire.
+            .onChange(of: config) { _, newValue in newValue.save() }
+        }
+    }
+
+    @ViewBuilder
+    private func gestureSection(_ title: String, action: Binding<GestureAction>) -> some View {
+        Section(title) {
+            Picker("Action", selection: action.target) {
+                ForEach(DispatchTarget.allCases) { Text($0.label).tag($0) }
+            }
+            if action.wrappedValue.target == .shortcut {
+                TextField("Shortcut name (exact)", text: action.shortcutName)
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.never)
+            }
+            if action.wrappedValue.target == .webhook {
+                TextField("https://…", text: action.webhookURL)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .keyboardType(.URL)
+            }
         }
     }
 

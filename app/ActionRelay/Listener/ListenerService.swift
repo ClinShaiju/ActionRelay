@@ -40,7 +40,7 @@ final class ListenerService: ObservableObject {
         let config = AppConfig.load()
         classifier = Classifier(ClassifierConfig(
             pressMaxMs: config.pressMaxMs, holdMinMs: config.holdMinMs, doubleWindowMs: config.doubleWindowMs))
-        dispatcher = Dispatcher(config: config)
+        dispatcher = Dispatcher() // loads config fresh per fire
 
         keepAlive.start()
         running = true
@@ -161,7 +161,7 @@ final class ListenerService: ObservableObject {
 
     private func fire(_ g: Gesture) {
         guard let dispatcher else { return }
-        dispatcher.dispatch(g)
+        if let err = dispatcher.dispatch(g) { lastError = err }
         lastEvent = "\(dispatcher.label(g)) @ \(Date().formatted(date: .omitted, time: .standard))"
     }
 

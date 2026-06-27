@@ -67,23 +67,56 @@ enum PairingImport {
 
 /// What to do when a gesture fires (§8.3).
 enum DispatchTarget: String, Codable, CaseIterable, Identifiable {
+    case none
     case notification
-    case webhook
     case flashlight
+    case mediaPlayPause
+    case mediaNext
+    case mediaPrevious
     case shortcut
+    case webhook
     var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .none: return "Nothing"
+        case .notification: return "Notification"
+        case .flashlight: return "Flashlight toggle"
+        case .mediaPlayPause: return "Play / Pause"
+        case .mediaNext: return "Next track"
+        case .mediaPrevious: return "Previous track"
+        case .shortcut: return "Run Shortcut (foreground only)"
+        case .webhook: return "Webhook (POST)"
+        }
+    }
 }
 
-/// User configuration, persisted as JSON in the app container.
-struct AppConfig: Codable, Equatable {
-    var target: DispatchTarget = .notification
-    var webhookURL: String = ""
+/// One gesture's action + its parameters. Each of press/hold/double gets one.
+struct GestureAction: Codable, Equatable {
+    var target: DispatchTarget = .none
     var shortcutName: String = ""
+    var webhookURL: String = ""
+}
+
+/// User configuration, persisted as JSON in the app container. Per-gesture
+/// actions (§8.3) so press/hold/double can each do something different.
+struct AppConfig: Codable, Equatable {
+    var press = GestureAction(target: .notification)
+    var hold = GestureAction()
+    var double = GestureAction()
 
     // Classifier tunables (§8.1), patchable without a rebuild.
     var pressMaxMs: UInt64 = 350
     var holdMinMs: UInt64 = 600
     var doubleWindowMs: UInt64 = 350
+
+    func action(for g: Gesture) -> GestureAction {
+        switch g {
+        case .press: return press
+        case .hold: return hold
+        case .double: return double
+        }
+    }
 
     static func load() -> AppConfig {
         guard let data = try? Data(contentsOf: Store.configFile),
