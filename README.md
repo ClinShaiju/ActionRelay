@@ -1,64 +1,68 @@
 # ActionRelay
 
 On-device, untethered iPhone **Action Button** press detector. Reads the raw
-button down/up HID transitions that `backboardd` logs, over an on-device
-lockdown log relay carried by a NetworkExtension loopback VPN — no jailbreak, no
-tether. Full design in [PROJECT.md](PROJECT.md).
+button down/up HID transitions that `backboardd` logs, over the device's own
+`syslog_relay` carried by an on-device (userspace) RSD tunnel — no jailbreak, no
+tether, **no Network Extension**. Full original design in [PROJECT.md](PROJECT.md);
+the architecture that's actually being built is in [docs/integration.md](docs/integration.md).
 
-## Status — honest
+## Architecture (NE-free)
 
-This repo is **pre–Phase 0**. The architecture is scaffolded and the one piece
-that is hardware-independent — the gesture **classifier** — is implemented and
-tested. Everything that depends on the actual log signal is deliberately stubbed.
+The spec assumed a NEPacketTunnelProvider was needed for the tunnel. It isn't —
+`idevice` ships its own **userspace TCP/IP stack**, so the RSD tunnel to the
+device's own services needs no system VPN/utun (the reference app StikDebug has
+no NE either). We dropped the Network Extension entirely:
+
+- **One app target, zero restricted entitlements** → installable with *any* cert,
+  including an import-only/wildcard one (the NE's `packet-tunnel-provider` + App
+  Group can't be provisioned by such certs — that was blocking install).
+- **Background persistence** via a silent `AVAudioSession` keepalive (the proven
+  sideload technique), not a VPN.
+- Tunnel + `syslog_relay` + classifier + dispatch all run **in-app**.
+
+## Status
 
 | Part | State |
 |---|---|
-| Gesture classifier (§8.1) | ✅ Implemented + tested (Rust canonical, Swift port) |
-| SwiftUI app (status / config / pairing) | ✅ Compiles, wired to App Group |
-| PacketTunnel NE skeleton + pipeline | ✅ Compiles; classifier+dispatcher live |
-| Dispatch: notification / webhook (§8.3) | ✅ Implemented |
+| Gesture classifier (§8.1) | ✅ Implemented + tested (Rust canonical, Swift port), validated vs real device timing |
 | **Phase 0 signal capture** (§3) | ✅ **GO** — confirmed on iPhone 16 Pro / iOS 26.5, see [docs/signal.md](docs/signal.md) |
-| idevice FFI link (xcframework) | ✅ CI-proven — NE compiles+links against `IDevice.xcframework`, see [docs/integration.md](docs/integration.md) |
+| Single-target app (status/config/pairing/keepalive) | ✅ Compiles; **installable, zero restricted entitlements** |
+| idevice FFI link (xcframework) | ✅ CI-proven — app compiles+links against `IDevice.xcframework` |
 | Relay client `syslog_relay` (§7.2) | ✅ Real FFI loop compiles (`#if canImport(IDevice)`); runtime needs signed build |
-| RSD tunnel bring-up (§7.1) | 🚧 Sequence documented (integration.md); provider code + device runtime remain |
-| Feather signing / install (§9) | 🚧 Manual — needs your distribution cert |
+| RSD tunnel bring-up (§7.1) | 🚧 Sequence documented (integration.md); in-app bring-up + device runtime remain |
+| Feather signing / install (§9) | ✅ Installs with import-only cert (no special entitlements) |
 
 **Phase 0 result:** a short tap emits a distinct down/up pair in plain syslog at
 default level — `backboardd <NOTICE>: Action page:0xB usage:0x2D downEvent:1 down`
 (and `downEvent:0 up`). Real-device timing validated the classifier thresholds
-exactly (181/188 ms taps, 1038 ms hold, 151 ms double-gap). The on-device build
-proceeds on the simplest path: `syslog_relay`, no DDI. Until the tunnel + relay
-are wired in, `RelayClient` emits nothing rather than fake a signal.
+exactly (181/188 ms taps, 1038 ms hold, 151 ms double-gap). Until the tunnel +
+relay are wired in, the listener emits nothing rather than fake a signal.
 
 ## What you get from CI
 
-GitHub Actions builds an **unsigned `.ipa`** (artifact `ActionRelay-unsigned`)
-and runs the Rust tests on every push. The unsigned IPA proves the app + NE
-compile and bundle; it is **not installable as-is** — sign it with Feather using
-your paid Apple Developer distribution cert + the two `.mobileprovision` files
-(§9). It will not do anything useful until Phase 0 + the tunnel land.
+Every push to `main` publishes an **unsigned `.ipa`** to
+[Releases](../../releases) (tag `build-<sha>`) and runs the Rust tests. The IPA is
+single-target with no restricted entitlements, so **sign it with Feather + any
+cert and it installs** — but it won't detect presses until the idevice tunnel is
+wired (see [docs/integration.md](docs/integration.md)). The manual *idevice link
+probe* workflow adds `ActionRelay-idevice-unsigned.ipa` (links the xcframework).
 
 ## Build locally
 
 ```sh
-# Rust core (the tested classifier)
-cd core && cargo test
-
-# Xcode project (macOS, needs xcodegen: brew install xcodegen)
-xcodegen generate
-open ActionRelay.xcodeproj
+cd core && cargo test            # the tested classifier
+xcodegen generate && open ActionRelay.xcodeproj   # macOS + brew install xcodegen
 ```
 
 ## Next steps (in order)
 
-1. **Phase 0** on the device — fill in [docs/signal.md](docs/signal.md). Gate.
-2. Wire `idevice`/`minimuxer`/`em_proxy` into the Rust core; bring up the RSD
-   tunnel in the NE (Phase 1).
-3. Implement the relay client against the Phase-0 predicate (Phase 2).
+1. Wire the in-app idevice tunnel bring-up (`tunnel_create_rppairing` → RSD →
+   heartbeat) ahead of `RelayClient.startRSD` — integration.md has the sequence.
+2. Validate end-to-end on the device with a Feather-signed build: press → classifier → notification.
+3. Tune keepalive robustness (audio-interruption recovery; optional location anchor).
 4. Replace the Swift classifier with the Rust one over FFI.
-5. Feather signing script with your cert (Phase 5).
 
 ## License
 
-AGPL-3.0-or-later — the design reuses StikDebug/idevice/minimuxer
-(AGPL/copyleft), so ActionRelay inherits it (§6).
+AGPL-3.0-or-later — reuses StikDebug/idevice (AGPL/copyleft), so ActionRelay
+inherits it (§6).
