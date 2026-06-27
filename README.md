@@ -18,8 +18,9 @@ tested. Everything that depends on the actual log signal is deliberately stubbed
 | PacketTunnel NE skeleton + pipeline | ✅ Compiles; classifier+dispatcher live |
 | Dispatch: notification / webhook (§8.3) | ✅ Implemented |
 | **Phase 0 signal capture** (§3) | ✅ **GO** — confirmed on iPhone 16 Pro / iOS 26.5, see [docs/signal.md](docs/signal.md) |
-| RSD tunnel via idevice/em_proxy (§7.1) | 🚧 Stub — needs Rust link (Phase 1) |
-| Relay client `syslog_relay` (§7.2) | 🚧 Stub — predicate now known (Phase 2) |
+| idevice FFI link (xcframework) | ✅ CI-proven — NE compiles+links against `IDevice.xcframework`, see [docs/integration.md](docs/integration.md) |
+| Relay client `syslog_relay` (§7.2) | ✅ Real FFI loop compiles (`#if canImport(IDevice)`); runtime needs signed build |
+| RSD tunnel bring-up (§7.1) | 🚧 Sequence documented (integration.md); provider code + device runtime remain |
 | Feather signing / install (§9) | 🚧 Manual — needs your distribution cert |
 
 **Phase 0 result:** a short tap emits a distinct down/up pair in plain syslog at
