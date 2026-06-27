@@ -21,8 +21,18 @@ targets:
     platform: iOS
     sources:
       - path: app/ActionRelay
+    # XcodeGen GENERATES this Info.plist from `properties` (do not hand-write a
+    # separate file — `info.path` overwrites it). These keys are essential:
+    #   UILaunchStoryboardName → full-screen (else iPhone-8-aspect letterbox)
+    #   UIBackgroundModes audio → the silent-audio keepalive can run backgrounded
     info:
       path: app/Info.plist
+      properties:
+        CFBundleDisplayName: ActionRelay
+        LSRequiresIPhoneOS: true
+        UILaunchStoryboardName: LaunchScreen
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        UIBackgroundModes: [audio]
     # No entitlements file on purpose.
     settings:
       base:
